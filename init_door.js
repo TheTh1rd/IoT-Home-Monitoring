@@ -16,6 +16,9 @@ let SENSOR = 5;
 
 let topic = 'mos/door1';
 
+let i = 0;
+let amountSent = 5;
+
 GPIO.set_mode(RED_LED, GPIO.MODE_OUTPUT);
 GPIO.set_mode(GRN_LED, GPIO.MODE_OUTPUT);
 
@@ -31,6 +34,17 @@ let getMotion = function() {
 };
 
 
+let getMotion5 = function() {
+  //getTimestamp();
+  return JSON.stringify(doorSensed);
+};
+
+ 
+let doorSensed = {
+	'DoorOpen' : "YES",
+  'TimeOpened' : ['0','0','0','0','0','0','0','0','0','0']
+};
+
 // Store door state so we can detect change
 let sensor_state = 0;
 // Primary loop run every 1 second looking for a door state change
@@ -42,17 +56,22 @@ Timer.set(1000, 1, function() {
     GPIO.write(RED_LED, 0);
     GPIO.write(GRN_LED, 1);
     if ( sensor_state === 0 ) {
-      let message1 = getMotion();
-      let ok = MQTT.pub(topic, message1, 1);
-      print('Published:', ok, topic, '->', message1);
+      doorSensed.TimeOpened[i] = Timer.now();
+      print(getMotion5());
+      i++;
       sensor_state = 1;
+      if(i>(amountSent-1)){
+        let message1 = getMotion5();
+        let ok = MQTT.pub(topic, message1, 1);
+        print('Published:', ok, topic, '->', message1);
+        i = 0;
+      }
     }
   } else {
     print("Door is CLOSED");
     GPIO.write(RED_LED, 1);
     GPIO.write(GRN_LED, 0);
     if ( sensor_state === 1 ) {
-      //MQTT.pub('mos/door', '{"message": "The door is closed.", "default": "", "state": "closed"}');
       sensor_state = 0;
     }
   }
