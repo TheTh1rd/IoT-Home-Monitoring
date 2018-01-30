@@ -9,6 +9,7 @@ load('api_http.js');
 let led = Cfg.get('pins.led');       					// Dev board LED 
 let button = Cfg.get('pins.button'); 					// Dev board button (0)
 let topic = 'mosTesting';            					// Subscription topic in AWS IoT
+
 let STEP_YELLOW = 12;    								// To stepper motor yellow
 let STEP_ORANGE = 14;    								// To stepper motor orange
 let STEP_RED = 27;       								// To stepper motor red
@@ -17,10 +18,11 @@ let BEAM_SENSOR = 16;    								// beam break sensor input
 let PILL_BUTTON = 17;    								// Pill dispenser button input
 let RESET_BUTTON = 5;    								// Reset button input
 
-let RESET_DELAY = 5;									//Reset button debounce delay
-let PILL_DELAY  = 10									//Pill dispense button debounce delay
+let RESET_DELAY = 10;									//Reset button debounce delay
+let PILL_DELAY  = 17;									//Pill dispense button debounce delay
 let resetTime = 0;										//Initialize reset time for debounce
 let dispenseTime = 0;									//Initialize reset time for debounce
+let delay = 0;                        //trial for reset function
 
 GPIO.set_mode(led, GPIO.MODE_OUTPUT);  					// Dev board LED 
 GPIO.set_mode(STEP_YELLOW,GPIO.MODE_OUTPUT);    		// To stepper motor yellow
@@ -30,7 +32,6 @@ GPIO.set_mode(STEP_BROWN, GPIO.MODE_OUTPUT);     		// To stepper motor brown
 GPIO.set_mode(BEAM_SENSOR,GPIO.MODE_INPUT);      		// beam break sensor input
 GPIO.set_mode(PILL_BUTTON,GPIO.MODE_INPUT);      		// Pill dispenser button input
 GPIO.set_mode(RESET_BUTTON,GPIO.MODE_INPUT);     		// Reset button input
-
 
 // Build the JSON body that is sent to AWS 
 let getJSON = function() {
@@ -48,13 +49,12 @@ GPIO.set_button_handler(PILL_BUTTON, GPIO.PULL_UP, GPIO.INT_EDGE_NEG, 200, funct
 		let message = getJSON();						//Fetch json table to send
 		let ok = MQTT.pub(topic, message, 1);			//Publish to AWS
 		print('Published:', ok, topic, '->', message); 	//Print confirmation
-	  
+
 	  // Rotate pill dispenser one slot (eject 1 pill)
 	  let currentStep = 0;
-	  let stepTotal = 382;//765;
+	  let stepTotal = 765;
 	  print('---BUTTON PRESSED---');
 		for(let i=0; i<stepTotal; i++){
-		  // print('---ENTERING SWITCH---');
 		  if (currentStep === 0){
 			GPIO.write(STEP_YELLOW,1);
 			GPIO.write(STEP_ORANGE,0);
@@ -86,6 +86,7 @@ GPIO.set_button_handler(PILL_BUTTON, GPIO.PULL_UP, GPIO.INT_EDGE_NEG, 200, funct
 		GPIO.write(STEP_ORANGE,0);
 		GPIO.write(STEP_RED,0);
 		GPIO.write(STEP_BROWN,0);
+	//	GIOP.write(MOTORPOS,0);
 		print("Medication has been dispensed.");
     }
 	else{
@@ -96,13 +97,13 @@ GPIO.set_button_handler(PILL_BUTTON, GPIO.PULL_UP, GPIO.INT_EDGE_NEG, 200, funct
 // Called by a press of the reset button 
 GPIO.set_button_handler(RESET_BUTTON, GPIO.PULL_UP, GPIO.INT_EDGE_NEG, 200, function() {
 	if(Timer.now() > resetTime + RESET_DELAY){			//Debounce button
-	    resetTime = Timer.now();						//Set debounce time						
+	  resetTime = Timer.now();						//Set debounce time	
+	  delay = Timer.now();
 		let currentStepR = 0;							//Initialize motor steps
 	  
 	    // Rotate pill dispenser back to starting place
-	    print('---RESET BUTTON PRESSED---');
-		while(GPIO.read(BEAM_SENSOR) === 0){
-		  //print('---ENTERING REVERSE MODE---');
+	  print('---RESET BUTTON PRESSED---');
+		while(GPIO.read(BEAM_SENSOR) === 0 && Timer.now() - delay < 28.0){
 		  if (currentStepR === 0){
 			GPIO.write(STEP_YELLOW,1);
 			GPIO.write(STEP_ORANGE,0);
@@ -128,6 +129,19 @@ GPIO.set_button_handler(RESET_BUTTON, GPIO.PULL_UP, GPIO.INT_EDGE_NEG, 200, func
 		  
 		  let time_start = Sys.uptime();
 		  while( (Sys.uptime() - time_start) < 0.002); // wait for 2 milliseconds 
+		  
+		/*  if(Timer.now() - delay > 2.000)
+		  {
+		    while(Timer.now() - delay < 2.200){
+		      GPIO.write(STEP_YELLOW,0);
+		      GPIO.write(STEP_ORANGE,0);
+		      GPIO.write(STEP_RED,0);
+		      GPIO.write(STEP_BROWN,0);
+		    }
+		    while(Timer.now() - delay < 4.000);
+		    delay = Timer.now();
+		    print('delay done');
+		  }*/
 		}
 
 		GPIO.write(STEP_YELLOW,0);
@@ -135,9 +149,10 @@ GPIO.set_button_handler(RESET_BUTTON, GPIO.PULL_UP, GPIO.INT_EDGE_NEG, 200, func
 		GPIO.write(STEP_RED,0);
 		GPIO.write(STEP_BROWN,0);
 		print("Position reset.");
+		delay = Timer.now();
 	}
 	else{
-		print("Bounced");
+		print("BouncedR");
 	}
 }, null);
 
@@ -157,3 +172,6 @@ Net.setStatusEventHandler(function(ev, arg) {
   }
   print('== Net event:', ev, evs);
 }, null);
+
+
+
