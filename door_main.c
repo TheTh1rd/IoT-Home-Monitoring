@@ -19,6 +19,24 @@ static void gotosleep(int pin, void *arg){
 
   esp_deep_sleep_start();
 }
+//
+//Function to publish to amazon on button push
+static void button_cb(int pin, void *arg) {
+  char topic[100], message[100];
+  struct json_out out = JSON_OUT_BUF(message, sizeof(message));
+  snprintf(topic, sizeof(topic), "/devices/%s/events",
+           mgos_sys_config_get_device_id());
+  json_printf(&out, "{total_ram: %lu, free_ram: %lu}",
+              (unsigned long) mgos_get_heap_size(),
+              (unsigned long) mgos_get_free_heap_size());
+  bool res = mgos_mqtt_pub(topic, message, strlen(message), 1, false);
+  LOG(LL_INFO, ("Pin: %d, published: %s", pin, res ? "yes" : "no"));
+  (void) arg;
+}
+
+
+
+
 
 //  HELPER FUNCTION: Decode the reason for resetting. 
 //  Refer to:
@@ -90,11 +108,20 @@ enum mgos_app_init_result mgos_app_init(void) {
   mgos_gpio_set_pull(pin, MGOS_GPIO_PULL_UP);
   
   mgos_gpio_set_mode(17, MGOS_GPIO_MODE_OUTPUT);
+ 
+  int button = 22;
+  mgos_gpio_set_mode(button, MGOS_GPIO_MODE_OUTPUT);
+  mgos_gpio_set_pull(pin, MGOS_GPIO_PULL_UP);
   
   printf("MGOS GPIO13 read: %d\n", mgos_gpio_read(13));
   printf("RTC GPIO13 read: %d\n", rtc_gpio_get_level(13));
 
   mgos_set_timer(2000, MGOS_TIMER_REPEAT, sensor_timer_cb, NULL);
+  
+   /* Publish to MQTT on button press */
+  mgos_gpio_set_button_handler(button,
+                               MGOS_GPIO_PULL_UP, MGOS_GPIO_INT_EDGE_NEG, 200,
+                               button_cb, NULL);
 
   return MGOS_APP_INIT_SUCCESS;
 }
