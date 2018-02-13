@@ -29,7 +29,7 @@ static void button_cb(int pin, void *arg) {
   json_printf(&out, "{total_ram: %lu, free_ram: %lu}",
               (unsigned long) mgos_get_heap_size(),
               (unsigned long) mgos_get_free_heap_size());
-  bool res = mgos_mqtt_pub(topic, message, strlen(message), 1, false);
+  bool res = mgos_mqtt_pub("mos/door", message, strlen(message), 1, false);
   LOG(LL_INFO, ("Pin: %d, published: %s", pin, res ? "yes" : "no"));
   (void) arg;
 }
@@ -84,6 +84,28 @@ void why_wake(){
   printf("\n");
 }
 
+
+static void net_cb(int ev, void *evd, void *arg) {
+  switch (ev) {
+    case MGOS_NET_EV_DISCONNECTED:
+      LOG(LL_INFO, ("%s", "Net disconnected"));
+      break;
+    case MGOS_NET_EV_CONNECTING:
+      LOG(LL_INFO, ("%s", "Net connecting..."));
+      break;
+    case MGOS_NET_EV_CONNECTED:
+      LOG(LL_INFO, ("%s", "Net connected"));
+      break;
+    case MGOS_NET_EV_IP_ACQUIRED:
+      LOG(LL_INFO, ("%s", "Net got IP address"));
+      break;
+  }
+
+  (void) evd;
+  (void) arg;
+}
+
+
 // Read the sensor via timer
 //
 static void sensor_timer_cb(void *arg){
@@ -111,7 +133,7 @@ enum mgos_app_init_result mgos_app_init(void) {
  
   int button = 22;
   mgos_gpio_set_mode(button, MGOS_GPIO_MODE_OUTPUT);
-  mgos_gpio_set_pull(pin, MGOS_GPIO_PULL_UP);
+  mgos_gpio_set_pull(button, MGOS_GPIO_PULL_UP);
   
   printf("MGOS GPIO13 read: %d\n", mgos_gpio_read(13));
   printf("RTC GPIO13 read: %d\n", rtc_gpio_get_level(13));
@@ -122,6 +144,9 @@ enum mgos_app_init_result mgos_app_init(void) {
   mgos_gpio_set_button_handler(button,
                                MGOS_GPIO_PULL_UP, MGOS_GPIO_INT_EDGE_NEG, 200,
                                button_cb, NULL);
+
+  /* Network connectivity events */
+  mgos_event_add_group_handler(MGOS_EVENT_GRP_NET, net_cb, NULL);
 
   return MGOS_APP_INIT_SUCCESS;
 }
