@@ -15,6 +15,7 @@ print('LED GPIO:', led, 'button GPIO:', button);
 
 let getInfo = function() {
   return JSON.stringify({
+    "Humidity" : (((ADC.read(35))/1000)/60 +0.5)*100,
    "Temperature" : (ADC.read(34)-35)/10,
     "Name" : "Joel",
    "Timestamp" : Timer.now(),
